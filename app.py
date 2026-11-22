@@ -1,95 +1,95 @@
-import gradio as gr
+import streamlit as st
+from PIL import Image
 from ultralytics import YOLO
 
-model = YOLO("model_deteksi_cabai_best.pt")
+st.set_page_config(
+    page_title="Deteksi Penyakit & Hama Daun Cabai",
+    page_icon="🌶️",
+    layout="centered",
+)
+
+
+@st.cache_resource
+def load_model():
+  return YOLO("model_deteksi_cabai_best.pt")
+
+
+model = load_model()
 
 info_hama = {
     "Sehat": (
         "Daun Sehat",
-        (
-            "Daun terlihat sehat. Pertahankan penyiraman cukup, pemupukan"
-            " berimbang, dan pemantauan rutin."
-        ),
+        "Daun terlihat sehat. Pertahankan penyiraman cukup, pemupukan berimbang, dan pemantauan rutin.",
     ),
     "Kutu_Kebul": (
         "Terindikasi Kutu Kebul",
-        (
-            "Pasang perangkap kuning berperekat, bersihkan gulma sekitar,"
-            " pangkas daun parah, dan gunakan pestisida nabati/insektisida"
-            " sesuai anjuran."
-        ),
+        "Pasang perangkap kuning berperekat, bersihkan gulma sekitar, pangkas daun parah, dan gunakan pestisida nabati/insektisida sesuai anjuran.",
     ),
     "Thrips": (
-        "Terindikasi Hama Thrips",
-        (
-            "Pangkas bagian daun/pucuk yang keriting parah, pasang perangkap"
-            " lekat, dan kendalikan sesuai anjuran."
-        ),
+        "Terindikasi Thrips",
+        "Periksa bagian bawah daun, jaga kelembapan/irigasi tanaman, singkirkan bagian yang terinfeksi berat, dan aplikasikan pengendalian hama sesuai rekomendasi.",
     ),
     "Tungau": (
-        "Terindikasi Hama Tungau",
-        (
-            "Semprot bagian bawah daun dengan air bersih, jaga kelembapan,"
-            " dan gunakan akarisida/bahan nabati bila diperlukan."
-        ),
+        "Terindikasi Tungau",
+        "Kurangi kondisi terlalu kering/berdebu di sekitar tanaman, isolasi atau pangkas daun terserang berat, dan gunakan akarisida/pengendalian yang sesuai.",
     ),
 }
 
+st.title("🌶️ Klasifikasi & Deteksi Daun Cabai")
+st.write(
+    "Unggah foto daun cabai untuk mendeteksi kondisi tanaman menggunakan model"
+    " YOLOv8."
+)
 
-def prediksi_daun_cabai(gambar):
-  if gambar is None:
-    return "Silakan unggah foto daun cabai terlebih dahulu.", "-"
+uploaded_file = st.file_uploader(
+    "Pilih gambar daun cabai",
+    type=["jpg", "jpeg", "png", "webp"],
+)
 
-  hasil = model.predict(gambar, verbose=False)[0]
-  idx = int(hasil.probs.top1)
-  kelas = model.names[idx]
-  yakin = float(hasil.probs.top1conf) * 100
+if uploaded_file is not None:
+  image = Image.open(uploaded_file).convert("RGB")
+  st.image(image, caption="Gambar yang Diunggah", use_container_width=True)
 
-  label_status, saran = info_hama.get(
-      kelas,
-      (
-          kelas,
-          "Terdeteksi kondisi pada daun, lakukan pengecekan lanjutan.",
-      ),
-  )
+  if st.button("Deteksi Sekarang", type="primary"):
+    with st.spinner("Sedang menganalisis gambar..."):
+      results = model(image)
+      result = results[0]
 
-  ringkasan = (
-      f"### Hasil Prediksi: {kelas}\n"
-      f"**Status:** {label_status}\n\n"
-      f"**Tingkat Keyakinan:** {yakin:.2f}%"
-  )
-  return ringkasan, saran
-
-
-with gr.Blocks() as app:
-  gr.Markdown("# Sistem Deteksi Kondisi Daun Cabai")
-  gr.Markdown(
-      "### Mengapa Menggunakan Klasifikasi?\n"
-      "Pendekatan **klasifikasi citra** (`YOLOv8-cls`) dipilih agar sistem"
-      " dapat mengenali kondisi keseluruhan foto daun cabai (`Sehat`,"
-      " `Kutu_Kebul`, `Thrips`, `Tungau`) secara cepat dan praktis tanpa"
-      " mengharuskan pemberian kotak label manual pada tiap objek di"
-      " gambar.\n\n"
-      "**Petunjuk:** Unggah **foto daun cabai** pada kolom input di kiri,"
-      " lalu klik **Deteksi** untuk melihat hasil dan saran penanganan."
-  )
-
-  with gr.Row():
-    with gr.Column():
-      input_gambar = gr.Image(type="pil", label="Input Foto Daun Cabai")
-      tombol_deteksi = gr.Button("Deteksi", variant="primary")
-
-    with gr.Column():
-      output_hasil = gr.Markdown(label="Hasil Deteksi")
-      output_saran = gr.Textbox(
-          label="Saran Penanganan Awal", lines=4, interactive=False
+      # Tampilkan gambar hasil deteksi (jika ada bounding box)
+      plotted = result.plot()
+      plotted_rgb = Image.fromarray(plotted[..., ::-1])
+      st.image(
+          plotted_rgb, caption="Hasil Deteksi", use_container_width=True
       )
 
-  tombol_deteksi.click(
-      fn=prediksi_daun_cabai,
-      inputs=input_gambar,
-      outputs=[output_hasil, output_saran],
-  )
+      # Cek hasil deteksi objek (boxes) maupun klasifikasi (probs)
+      detected_labels = []
+      if result.boxes is not None and len(result.boxes) > 0:
+        for box in result.boxes:
+          cls_id = int(box.cls[0].item())
+          conf = float(box.conf[0].item())
+          label = model.names.get(cls_id, str(cls_id))
+          detected_labels.append((label, conf))
+      elif result.probs is not None:
+        cls_id = int(result.probs.top1)
+        conf = float(result.probs.top1conf.item())
+        label = model.names.get(cls_id, str(cls_id))
+        detected_labels.append((label, conf))
 
-if __name__ == "__main__":
-  app.launch(theme=gr.themes.Soft())
+      if detected_labels:
+        st.subheader("Hasil Analisis")
+        for label, conf in detected_labels:
+          judul, saran = info_hama.get(
+              label,
+              (
+                  f"Terdeteksi: {label}",
+                  "Lakukan pemeriksaan lanjutan pada tanaman dan sesuaikan penanganan dengan kondisi lapangan.",
+              ),
+          )
+          st.markdown(f"**{judul}** (Keyakinan: `{conf:.2%}`)")
+          st.info(saran)
+      else:
+        st.warning(
+            "Tidak ada objek daun/hama yang terdeteksi dengan jelas pada gambar"
+            " ini."
+        )
