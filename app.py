@@ -35,7 +35,7 @@ info_hama = {
     ),
 }
 
-st.title("🌶️ Klasifikasi & Deteksi Daun Cabai")
+st.title("🌶️ Deteksi Daun Cabai & Cara Penanganan")
 st.write(
     "Unggah foto daun cabai untuk mendeteksi kondisi tanaman menggunakan model"
     " YOLOv8."
@@ -55,14 +55,9 @@ if uploaded_file is not None:
       results = model(image)
       result = results[0]
 
-      # Tampilkan gambar hasil deteksi (jika ada bounding box)
-      plotted = result.plot()
-      plotted_rgb = Image.fromarray(plotted[..., ::-1])
-      st.image(
-          plotted_rgb, caption="Hasil Deteksi", use_container_width=True
-      )
+      # Gambar bersih tanpa tulisan angka keakuratan dari result.plot()
+      st.image(image, caption="Hasil Deteksi", use_container_width=True)
 
-      # Cek hasil deteksi objek (boxes) maupun klasifikasi (probs)
       detected_labels = []
       if result.boxes is not None and len(result.boxes) > 0:
         for box in result.boxes:
@@ -83,10 +78,10 @@ if uploaded_file is not None:
               label,
               (
                   f"Terdeteksi: {label}",
-                  "Lakukan pemeriksaan lanjutan pada tanaman dan sesuaikan penanganan dengan kondisi lapangan.",
+                  "Lakukan pemeriksaan lanjutan pada tanaman di lapangan.",
               ),
           )
-          st.markdown(f"**{judul}** (Keyakinan: `{conf:.2%}`)")
+          st.markdown(f"**{judul}**")
           st.info(saran)
       else:
         st.warning(
