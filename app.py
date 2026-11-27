@@ -55,7 +55,7 @@ if uploaded_file is not None:
       results = model(image)
       result = results[0]
 
-      # Gambar bersih tanpa tulisan angka keakuratan dari result.plot()
+      # Gambar tanpa tulisan angka/persentase dari result.plot()
       st.image(image, caption="Hasil Deteksi", use_container_width=True)
 
       detected_labels = []
@@ -81,7 +81,7 @@ if uploaded_file is not None:
                   "Lakukan pemeriksaan lanjutan pada tanaman di lapangan.",
               ),
           )
-          st.markdown(f"**{judul}**")
+          st.markdown(f"**{judul}** (Keyakinan: `{conf:.2%}`)")
           st.info(saran)
       else:
         st.warning(
